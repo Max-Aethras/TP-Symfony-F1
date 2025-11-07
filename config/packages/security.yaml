@@ -1,69 +1,66 @@
 security:
-    # https://symfony.com/doc/current/security.html#registering-the-user-hashing-passwords
+    # --------------------------------------------------------------------------
+    # 1. Hashing des Mots de Passe
+    # --------------------------------------------------------------------------
     password_hashers:
         Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface: 'auto'
-    # https://symfony.com/doc/current/security.html#loading-the-user-the-user-provider
+
+    # --------------------------------------------------------------------------
+    # 2. Fournisseur d'Utilisateurs (User Provider)
+    # --------------------------------------------------------------------------
     providers:
-        # used to reload user from session & other features (e.g. switch_user)
         app_user_provider:
             entity:
                 class: App\Entity\User
-                property: email
+                property: email # Le champ utilisé pour l'authentification
+
+    # --------------------------------------------------------------------------
+    # 3. Pare-feux (Firewalls)
+    # --------------------------------------------------------------------------
     firewalls:
+        # Pare-feu pour les outils de dev/debug de Symfony
         dev:
             pattern: ^/(_(profiler|wdt)|css|images|js)/
             security: false
+
+        # Pare-feu principal pour toute l'API
         main:
-            #lazy: true
-            #provider: app_user_provider
-            pattern: ^/api/login
+            # Important : La chaîne d'authentification est sans état (stateless)
             stateless: true
+            
+            # 3.1. Mécanisme de Connexion (Login)
+            # Cette configuration intercepte les requêtes POST vers /api/login
             json_login:
                 check_path: /api/login
+                username_path: email
+                password_path: password
+                # Handlers gérés par le bundle JWT
                 success_handler: lexik_jwt_authentication.handler.authentication_success
                 failure_handler: lexik_jwt_authentication.handler.authentication_failure
 
-        api_register:
-            pattern:   ^/api/user/create
-            stateless: false
-
-        api:
-            pattern:   ^/api
-            stateless: true
+            # 3.2. Mécanisme JWT (pour les requêtes suivantes)
+            # Active l'authentification par JWT sur toutes les routes de ce pare-feu
             jwt: ~
-
-            # activate different ways to authenticate
-            # https://symfony.com/doc/current/security.html#the-firewall
-
-            # https://symfony.com/doc/current/security/impersonating_user.html
-            # switch_user: true
-
-    # Easy way to control access for large sections of your site
-    # Note: Only the *first* access control that matches will be used
+            
+            # 🚨 L'option 'anonymous: true' a été retirée car elle n'est plus supportée.
+            # L'accès aux routes non authentifiées est géré dans 'access_control'.
+            
+    # --------------------------------------------------------------------------
+    # 4. Contrôle d'Accès (Access Control)
+    # --------------------------------------------------------------------------
     access_control:
-        - { path: ^/api/user/create, roles: PUBLIC_ACCESS, methods: POST }
-        - { path: ^/api/login, roles: PUBLIC_ACCESS , methods : POST}
-        - { path: '^/api/category/create', roles: [ROLE_ADMIN], methods: POST }
-        - { path: ^/api,       roles: [IS_AUTHENTICATED_FULLY] }
-        # - { path: '^/category/create', roles: [IS_AUTHENTICATED_FULLY, ROLE_USER], methods: POST }
-        # - { path: '^/product/create', roles: [PUBLIC_ACCESS], methods: POST }
-        # - { path: ^/api/login, roles: [PUBLIC_ACCESS] }
-        # - { path: ^/admin, roles: ROLE_ADMIN }
-        # - { path: ^/profile, roles: ROLE_USER }
+        # 🟢 Permettre l'accès à la route de connexion (json_login) sans être authentifié
+        - { path: ^/api/login, roles: PUBLIC_ACCESS, methods: [POST] }
 
+        # 🔒 L'ajout d'une infraction requiert le rôle ADMIN (exigence du sujet)
+        - { path: ^/api/infraction, roles: [ROLE_ADMIN], methods: [POST] }
+        
+        # 🔒 Sécuriser TOUTES les autres routes de l'API : l'utilisateur doit être authentifié
+        - { path: ^/api, roles: [IS_AUTHENTICATED_FULLY] }
+
+
+    # --------------------------------------------------------------------------
+    # 5. Hiérarchie des Rôles
+    # --------------------------------------------------------------------------
     role_hierarchy:
-        ROLE_ADMIN: [ROLE_MANAGER, ROLE_USER]
-        ROLE_MANAGER: [ROLE_USER]
-
-when@test:
-    security:
-        password_hashers:
-            # By default, password hashers are resource intensive and take time. This is
-            # important to generate secure password hashes. In tests however, secure hashes
-            # are not important, waste resources and increase test times. The following
-            # reduces the work factor to the lowest possible values.
-            Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface:
-                algorithm: auto
-                cost: 4 # Lowest possible value for bcrypt
-                time_cost: 3 # Lowest possible value for argon
-                memory_cost: 10 # Lowest possible value for argon
+        ROLE_ADMIN: [ROLE_USER]
