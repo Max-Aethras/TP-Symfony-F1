@@ -1,66 +1,36 @@
 security:
-    # --------------------------------------------------------------------------
-    # 1. Hashing des Mots de Passe
-    # --------------------------------------------------------------------------
     password_hashers:
         Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface: 'auto'
 
-    # --------------------------------------------------------------------------
-    # 2. Fournisseur d'Utilisateurs (User Provider)
-    # --------------------------------------------------------------------------
     providers:
         app_user_provider:
             entity:
                 class: App\Entity\User
-                property: email # Le champ utilisé pour l'authentification
+                property: email
 
-    # --------------------------------------------------------------------------
-    # 3. Pare-feux (Firewalls)
-    # --------------------------------------------------------------------------
     firewalls:
-        # Pare-feu pour les outils de dev/debug de Symfony
         dev:
             pattern: ^/(_(profiler|wdt)|css|images|js)/
             security: false
 
-        # Pare-feu principal pour toute l'API
         main:
-            # Important : La chaîne d'authentification est sans état (stateless)
             stateless: true
             
-            # 3.1. Mécanisme de Connexion (Login)
-            # Cette configuration intercepte les requêtes POST vers /api/login
             json_login:
                 check_path: /api/login
                 username_path: email
                 password_path: password
-                # Handlers gérés par le bundle JWT
                 success_handler: lexik_jwt_authentication.handler.authentication_success
                 failure_handler: lexik_jwt_authentication.handler.authentication_failure
 
-            # 3.2. Mécanisme JWT (pour les requêtes suivantes)
-            # Active l'authentification par JWT sur toutes les routes de ce pare-feu
             jwt: ~
             
-            # 🚨 L'option 'anonymous: true' a été retirée car elle n'est plus supportée.
-            # L'accès aux routes non authentifiées est géré dans 'access_control'.
-            
-    # --------------------------------------------------------------------------
-    # 4. Contrôle d'Accès (Access Control)
-    # --------------------------------------------------------------------------
     access_control:
-        # 🟢 Permettre l'accès à la route de connexion (json_login) sans être authentifié
         - { path: ^/api/login, roles: PUBLIC_ACCESS, methods: [POST] }
 
-        # 🔒 L'ajout d'une infraction requiert le rôle ADMIN (exigence du sujet)
         - { path: ^/api/infraction, roles: [ROLE_ADMIN], methods: [POST] }
         
-        # 🔒 Sécuriser TOUTES les autres routes de l'API : l'utilisateur doit être authentifié
         - { path: ^/api, roles: [IS_AUTHENTICATED_FULLY] }
 
-
-    # --------------------------------------------------------------------------
-    # 5. Hiérarchie des Rôles
-    # --------------------------------------------------------------------------
     role_hierarchy:
         ROLE_ADMIN: [ROLE_USER]
